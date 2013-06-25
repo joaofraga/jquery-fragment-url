@@ -2,53 +2,72 @@
  * Manipulate URL fragments
  * @author João Gabriel - jgfraga[at]gmail.com
  * @param hash string - the hash name
- * @param exec function - function to execute
+ * @param callback function - function to execute
  */
 
-jQuery.fragmentUrl = function( hash, exec ) {
-
-  if( typeof hash === 'undefined' || typeof exec === 'undefined' ) {
-    return;
+(function($){
+  
+  window.hashChanged = function(hash){
+    try {
+      window.hashCallbacks[hash](hash);
+    } catch(err) {
+      return false;
+    }
   }
-  else
-  {
 
-    if( typeof window.hashEvents !== 'object' ) {
+  var FragmentUrl = function(options) {
+    var defaults = {},
+        opts = $.extend(defaults, options);
+    window.hashCallbacks = window.hashCallbacks || [];
 
-      window.hashEvents = {};
-
-      var executeHashChangeEvent = function(){
-
-        var hrefHash = window.location.hash;
-
-        if ( typeof window.hashEvents[hrefHash] === 'function' ) {
-          window.hashEvents[hrefHash]();
-        }
-
-      };
-
-      if( "onhashchange" in window ) {
-        window.onhashchange = function(){
-          executeHashChangeEvent();
-        };
-      } else {
-        var storedHash = window.location.hash;
-        window.setInterval(function(){
-          if( window.location.hash !== storedHash ){
-            storedHash = window.location.hash;
-            executeHashChangeEvent();
-          }
-        }, 100);
-      }
-
-      window.onload = function(){
-        executeHashChangeEvent();
-      };
-
+    if( typeof opts['callback'] !== 'function' || typeof opts["hash"] === 'undefined' ){
+      return false;
     }
 
-    hash = ( hash.indexOf("#") !== -1 ) ? hash : "#" + hash;
-    window.hashEvents[hash] = exec;
+    var hash = (opts["hash"].indexOf("#") !== -1) ? opts["hash"] : "#" + opts["hash"];
 
+    window.hashCallbacks[hash] = opts["callback"];
+
+    return true;
   }
-};
+
+  /* Event handler, observe waiting for hash change */
+  var HashObserver = function(){
+
+    // Execute hash event if pages load with hash
+    $(window).load(function(){
+      if(window.location.hash.length > 0){
+        window.hashChanged(window.location.hash);
+      }  
+    })
+
+    // Verify if browser can handle hash change from default;
+    if( "onhashchange" in window ) {
+      window.onhashchange = function(){
+        // Executes callback
+        window.hashChanged(window.location.hash);
+      };
+      return true;
+    } 
+
+    // Implements hash change event observer;
+    // store a hash for comparison in future
+    var storedHash = "";
+
+    // use setInterval to look for hash change every 100 miliseconds
+    window.setInterval( function(){
+      if( window.location.hash !== storedHash ){
+        // Change stored hash
+        storedHash = window.location.hash;
+        // Executes callback
+        window.hashChanged(storedHash);
+      }
+    }, 100);
+
+  }();
+
+  $.fragment = function(options){
+    var fragmentUrl = new FragmentUrl(options);
+  }
+
+}(jQuery));
